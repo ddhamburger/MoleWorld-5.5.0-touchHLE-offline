@@ -5424,26 +5424,10 @@ pub fn intercept(env: &mut Environment, class: &str, sel: &str) -> bool {
         return false;
     }
 
-    // [扫描修 2026-09-15] F9-4 离线点好友(排行/推荐/访客/串门都从这里进):原版 -[VillageMenuLayer onButtonFriendSelected:]@0x615dc
-    //   全程无网络门,先 saveToLocal + 卸载主村地图再进空好友图,之后 getFriendsInfo 因 isReachable=0 静默 return,
-    //   玩家只看到一张只有自己的空图、没有任何提示。改为在卸图之前弹游戏自带文案 ACTION_CENTER_NETWARNING
-    //   (「该功能需要联网才能使用哦!」,与活动中心离线体验一致),吞掉按钮回调。菜单回调不在 drawScene 帧栈上,可以发消息。
-    if class == "VillageMenuLayer" && sel == "onButtonFriendSelected:" && !env.options.network_access {
-        let saved = [
-            env.cpu.regs()[0],
-            env.cpu.regs()[1],
-            env.cpu.regs()[2],
-            env.cpu.regs()[3],
-        ];
-        let msg = game_localized_string(env, "ACTION_CENTER_NETWARNING");
-        if show_game_message_box(env, msg, 6, nil, SEL::null()) {
-            log!("[MOLECHEAT] 离线:好友/排行/串门入口需要联网 → 弹「该功能需要联网」提示,不卸载主村");
-            env.cpu.regs_mut()[0] = 0;
-            return true;
-        }
-        // 弹框没发出去(类/文案缺失):不静默吞按钮,恢复寄存器走原版(最坏只是进空好友图,能正常回村)。
-        env.cpu.regs_mut()[0..4].copy_from_slice(&saved);
-    }
+    // [MoleWorld 本地分支] 原 F9-4 离线好友拦截已删除:用户要求恢复 v0.0.5 体验——
+    // 点好友照常卸主村图进好友页(排行/推荐/访客/串门同入口)。服务器已停,该页
+    // 本就取不到数据(getFriendsInfo 在 isReachable=0 下静默 return),但原版空页可看
+    // 自己资料、能正常回村;不再弹「该功能需要联网」吞按钮。
 
     // [扫描修 2026-09-15] F9-8 离线微博分享:-[SharedInterfaceLayer onSharedToSinaWeibo]@0x1a58b8 与
     //   onSharedToSinaWeiboGetShareReward@0x1a5a30 都没有网络门,直接进 ShareKit(钥匙串恒空 → 未授权 → 弹 OAuth WebView,
