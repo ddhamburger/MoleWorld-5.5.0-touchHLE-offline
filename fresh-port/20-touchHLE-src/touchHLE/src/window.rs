@@ -225,12 +225,32 @@ fn rotate_fullscreen_size(orientation: DeviceOrientation, screen_size: (u32, u32
         }
     }
 }
+/// [MoleWorld Android] 横屏 180° 反向显示开关。摩尔庄园等横屏应用在 Android 上被锁死在
+/// 一个横屏方向(强转右),想物理换到另一侧横屏拿不到。这里不改模拟状态(guest 仍认为
+/// 自己请求的是 LandscapeRight),只在"模拟方向 → 物理显示/触摸映射"的边界把两个横屏方向
+/// 互换:窗口转另一侧 + 画面多转 180°,触摸经 rotation_matrix 逆变换自动跟着翻。
+/// 桌面(Windows/mac/Linux)与 iOS 行为不变。
+#[inline]
+fn android_flip_landscape() -> bool {
+    cfg!(target_os = "android")
+}
+/// 横屏方向在物理屏幕上的等价方向(仅在 [android_flip_landscape] 为真时取反)。
+fn physical_orientation(orientation: DeviceOrientation) -> DeviceOrientation {
+    if !android_flip_landscape() {
+        return orientation;
+    }
+    match orientation {
+        DeviceOrientation::LandscapeLeft => DeviceOrientation::LandscapeRight,
+        DeviceOrientation::LandscapeRight => DeviceOrientation::LandscapeLeft,
+        other => other,
+    }
+}
 /// Tell SDL2 what orientation we want. Only useful on Android.
 fn set_sdl2_orientation(orientation: DeviceOrientation) {
     // Despite the name, this hint works on Android too.
     sdl2::hint::set(
         "SDL_IOS_ORIENTATIONS",
-        match orientation {
+        match physical_orientation(orientation) {
             DeviceOrientation::Portrait => "Portrait",
             // The inversion is deliberate. These probably correspond to
             // iPhone OS content orientations?
@@ -2406,7 +2426,7 @@ impl Window {
     /// rotating texture co-ordinates to display the image in the window; when
     /// rotating input co-ordinates, invert the matrix.
     pub fn rotation_matrix(&self) -> Matrix<2> {
-        match self.device_orientation {
+        match physical_orientation(self.device_orientation) {
             DeviceOrientation::Portrait => Matrix::identity(),
             DeviceOrientation::PortraitUpsideDown => Matrix::z_rotation(PI),
             DeviceOrientation::LandscapeLeft => Matrix::z_rotation(-FRAC_PI_2),
