@@ -69,10 +69,10 @@ android {
         // versionCode 由 v0.0.X 的 X 派生(=4)、随发版递增(覆盖更新需只增不减)。
         // 注意:applicationId 仍保留 .unofficial 后缀不动 —— 改包名会让老用户装成另一个 App、
         // 永远无法更新覆盖。
-        val moleUserVersion = System.getenv("MOLE_USER_VERSION") ?: "v0.0.4 beta"
+        val moleUserVersion = "v0.0.5-rot beta" // [实验] 固定版本串,绕开 CI env 的 v0.0.5
         val moleBuildHash = System.getenv("MOLE_BUILD_HASH")?.takeIf { it.isNotEmpty() }?.take(7) ?: "local"
         versionName = "$moleUserVersion ($moleBuildHash)"
-        versionCode = (System.getenv("MOLE_VERSION_CODE") ?: "4").toInt()
+        versionCode = 7 // [实验] 高于 5/6,与基线可共存安装
 
         minSdk = 21 // first version with AArch64
         targetSdk = 31

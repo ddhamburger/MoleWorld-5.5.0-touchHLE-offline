@@ -107,6 +107,17 @@ fn rotate_fullscreen_size(orientation: DeviceOrientation, screen_size: (u32, u32
 }
 /// Tell SDL2 what orientation we want. Only useful on Android.
 fn set_sdl2_orientation(orientation: DeviceOrientation) {
+    // [MoleWorld Android 实验] 横屏反向:仅翻转显示方向(画面+触摸随系统显示变换整体
+    // 转到另一侧横屏),渲染/输入矩阵不动。除这一段外与本 commit 原版逐字节一致。
+    let orientation = if cfg!(target_os = "android") {
+        match orientation {
+            DeviceOrientation::LandscapeLeft => DeviceOrientation::LandscapeRight,
+            DeviceOrientation::LandscapeRight => DeviceOrientation::LandscapeLeft,
+            other => other,
+        }
+    } else {
+        orientation
+    };
     // Despite the name, this hint works on Android too.
     sdl2::hint::set(
         "SDL_IOS_ORIENTATIONS",
