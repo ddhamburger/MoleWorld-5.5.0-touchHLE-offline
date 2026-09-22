@@ -226,15 +226,19 @@ fn rotate_fullscreen_size(orientation: DeviceOrientation, screen_size: (u32, u32
     }
 }
 /// [MoleWorld Android] 横屏 180° 反向显示开关。摩尔庄园等横屏应用在 Android 上被锁死在
-/// 一个横屏方向(强转右),想物理换到另一侧横屏拿不到。这里不改模拟状态(guest 仍认为
-/// 自己请求的是 LandscapeRight),只在"模拟方向 → 物理显示/触摸映射"的边界把两个横屏方向
-/// 互换:窗口转另一侧 + 画面多转 180°,触摸经 rotation_matrix 逆变换自动跟着翻。
-/// 桌面(Windows/mac/Linux)与 iOS 行为不变。
+/// 一个横屏方向(强转右),想物理换到另一侧横屏拿不到。
+/// ★只翻【显示方向】这一侧:set_sdl2_orientation 让 Android 把屏幕转到另一侧横屏。
+/// [实测教训 2026-09-22] rotation_matrix 不能再跟着翻:Android 的 buffer 空间随显示方向
+/// 一起转,画面(经 compositor 旋转)与触摸(经 input dispatcher 逆变换)本就用同一个显示
+/// 变换——两边再各翻 180° 会精确抵消,游戏画面原地不动,只有系统 UI 翻了过去。
+/// 只翻显示:画面+触摸+状态栏整体转 180°,相互关系不变。guest 状态、rotation_matrix、
+/// 桌面与 iOS 行为均不变。
 #[inline]
 fn android_flip_landscape() -> bool {
     cfg!(target_os = "android")
 }
 /// 横屏方向在物理屏幕上的等价方向(仅在 [android_flip_landscape] 为真时取反)。
+/// 仅供 [set_sdl2_orientation] 使用;渲染/输入矩阵一律用 guest 原始方向。
 fn physical_orientation(orientation: DeviceOrientation) -> DeviceOrientation {
     if !android_flip_landscape() {
         return orientation;
@@ -2426,7 +2430,10 @@ impl Window {
     /// rotating texture co-ordinates to display the image in the window; when
     /// rotating input co-ordinates, invert the matrix.
     pub fn rotation_matrix(&self) -> Matrix<2> {
-        match physical_orientation(self.device_orientation) {
+        // ★这里不要用 physical_orientation:Android 显示方向的翻转由系统 compositor 完成,
+        // buffer 内容与触摸坐标都跟随显示变换,再翻一次矩阵会与之抵消(见 physical_orientation
+        // 注释的实测教训)。画面旋转只认 guest 请求的方向。
+        match self.device_orientation {
             DeviceOrientation::Portrait => Matrix::identity(),
             DeviceOrientation::PortraitUpsideDown => Matrix::z_rotation(PI),
             DeviceOrientation::LandscapeLeft => Matrix::z_rotation(-FRAC_PI_2),
